@@ -2,14 +2,39 @@ import aiohttp
 import json
 import logging
 import os
+import re
 from dotenv import load_dotenv
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
+
+def extract_answer_number(text):
+    patterns = [
+        "Правильный ответ — ",
+        "Ответ: ",
+        "Правильный ответ: ",
+        "Ответ - "
+    ]
+
+    for pattern in patterns:
+        if pattern in text:
+            start_index = text.find(pattern) + len(pattern)
+            remaining_text = text[start_index:]
+            words = remaining_text.split()
+            for word in words:
+                if word.isdigit():
+                    return int(word)
+                elif any(char.isdigit() for char in word):
+                    number = ''.join(filter(str.isdigit, word))
+                    if number:
+                        return int(number)
+    return None
+
+
 async def get_result(text, id):
     load_dotenv()
-    print(os.getenv('folder_id'))
     headers = {"Authorization": f"Api-Key {os.getenv('api_token_search')}"}
 
     data = {
@@ -81,12 +106,18 @@ async def get_result(text, id):
             return {"error": "Ошибка сети при запросе к YandexGPT"}
 
         try:
+            answer = None
             if gpt_response[:2].isdigit():
                 answer = int(gpt_response[:2])
             elif gpt_response[:1].isdigit():
                 answer = int(gpt_response[:1])
-            else:
-                answer = None
+
+            if answer is None:
+                answer = extract_answer_number(gpt_response)
+
+
+
+
         except Exception as e:
             logger.error(f"Ошибка при разборе ответа: {str(e)}")
             answer = None
